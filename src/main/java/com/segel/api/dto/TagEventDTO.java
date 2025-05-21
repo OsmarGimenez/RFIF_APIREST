@@ -1,4 +1,4 @@
-package com.segel.api;
+package com.segel.api.dto;
 
 public class TagEventDTO {
     private String epc;

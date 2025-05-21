@@ -1,5 +1,7 @@
-package com.segel.api;
+package com.segel.api.controller;
 
+import com.segel.api.dto.TagEventDTO;
+import com.segel.api.service.TagEventService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
