@@ -1,59 +1,43 @@
-package com.segel.api.model;
+package com.segel.api.dto;
 
-import jakarta.persistence.*;
 import java.time.LocalDateTime;
 
-@Entity
-@Table(name = "rfid_events")
-public class RfidEventEntity {
+public class RfidEventDetailDTO {
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
-
-    @Column(nullable = false, length = 128) // Asumiendo que EPC no puede ser nulo
+    private Long id; // ID del registro en rfid_events
     private String epc;
-
-    // Relación con TipoEventoEntity
-    @ManyToOne(fetch = FetchType.LAZY) // LAZY es generalmente bueno para el rendimiento
-    @JoinColumn(name = "id_tipo_evento", nullable = true) // Nombre de la columna FK en rfid_events. 'nullable = true' si un evento podría no tener tipo (ajusta según tu lógica)
-    private TipoEventoEntity tipoEvento;
-
-    @Column(name = "event_time")
     private LocalDateTime eventTime;
-
-    @Column(length = 15) // Ajustado de VARCHAR(10) a VARCHAR(15) para rssi
     private String rssi;
-
-    @Column(length = 10)
     private String antenna;
-
-    @Column(length = 50)
     private String ticket;
+    private String estadoColor; // de rfid_events.estado_color
+    private String descripcion;   // la descripción editable del evento individual, de rfid_events.descripcion
 
-    @Column(name = "estado_color", length = 15)
-    private String estadoColor;
-
-    @Column(name = "descripcion", columnDefinition = "TEXT")
-    private String descripcion;
+    private String nombreDelTipoDeEvento;     // de tipos_evento.nombre_evento
+    private String descripcionDelTipoDeEvento; // de tipos_evento.descripcion_tipo
 
     // Constructor vacío
-    public RfidEventEntity() {
+    public RfidEventDetailDTO() {
     }
 
-    // Constructor actualizado (ejemplo)
-    public RfidEventEntity(String epc, TipoEventoEntity tipoEvento, LocalDateTime eventTime, String rssi, String antenna, String ticket, String estadoColor, String descripcion) {
+    // Constructor con todos los campos (puedes generar getters y setters con tu IDE)
+    public RfidEventDetailDTO(Long id, String epc, LocalDateTime eventTime, String rssi, String antenna, String ticket,
+                              String estadoColor, String descripcion, String nombreDelTipoDeEvento, String descripcionDelTipoDeEvento) {
+        this.id = id;
         this.epc = epc;
-        this.tipoEvento = tipoEvento;
         this.eventTime = eventTime;
         this.rssi = rssi;
         this.antenna = antenna;
         this.ticket = ticket;
         this.estadoColor = estadoColor;
         this.descripcion = descripcion;
+        this.nombreDelTipoDeEvento = nombreDelTipoDeEvento;
+        this.descripcionDelTipoDeEvento = descripcionDelTipoDeEvento;
     }
 
-    // Getters y Setters
+    // --- GETTERS Y SETTERS ---
+    // (Por brevedad, no los incluyo todos aquí, pero deberías tenerlos para todos los campos)
+
     public Long getId() {
         return id;
     }
@@ -68,14 +52,6 @@ public class RfidEventEntity {
 
     public void setEpc(String epc) {
         this.epc = epc;
-    }
-
-    public TipoEventoEntity getTipoEvento() {
-        return tipoEvento;
-    }
-
-    public void setTipoEvento(TipoEventoEntity tipoEvento) {
-        this.tipoEvento = tipoEvento;
     }
 
     public LocalDateTime getEventTime() {
@@ -124,5 +100,21 @@ public class RfidEventEntity {
 
     public void setDescripcion(String descripcion) {
         this.descripcion = descripcion;
+    }
+
+    public String getNombreDelTipoDeEvento() {
+        return nombreDelTipoDeEvento;
+    }
+
+    public void setNombreDelTipoDeEvento(String nombreDelTipoDeEvento) {
+        this.nombreDelTipoDeEvento = nombreDelTipoDeEvento;
+    }
+
+    public String getDescripcionDelTipoDeEvento() {
+        return descripcionDelTipoDeEvento;
+    }
+
+    public void setDescripcionDelTipoDeEvento(String descripcionDelTipoDeEvento) {
+        this.descripcionDelTipoDeEvento = descripcionDelTipoDeEvento;
     }
 }

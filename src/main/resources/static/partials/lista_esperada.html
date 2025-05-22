@@ -1,0 +1,57 @@
+<div id="listaEsperadaScreenView">
+    <h2>Lectura RFID - A Partir de Lista</h2>
+
+    <div class="controls card">
+        <h3>1. Cargar Lista de EPCs Esperados</h3>
+        <label for="epcListTextareaLE">Pegue los EPCs (uno por línea):</label>
+        <textarea id="epcListTextareaLE" rows="5" placeholder="EPC001&#10;EPC002&#10;EPC003"></textarea>
+        <button id="btnLoadAndPrepareLE">Cargar y Preparar Lista</button>
+    </div>
+
+    <div class="controls card">
+        <h3>2. Iniciar Lectura y Ver Estado</h3>
+        <button id="btnStartLE" disabled>Empezar Lectura de Lista</button>
+        <button id="btnStopLE" disabled>Detener Lectura</button>
+        <button id="btnClearLE" disabled>Limpiar Sesión Actual</button>
+        <button id="btnExportCsvLE">Exportar CSV</button> <div class="status-boxes">
+        <div class="status-box">
+            <h4>Esperados</h4>
+            <p id="leEsperadosCount">0</p>
+        </div>
+        <div class="status-box">
+            <h4>Leídos (Coinciden)</h4>
+            <p id="leLeidosCoincidenCount">0</p>
+        </div>
+        <div class="status-box">
+            <h4>Pendientes</h4>
+            <p id="lePendientesCount">0</p>
+        </div>
+        <div class="status-box">
+            <h4>No Corresponden</h4>
+            <p id="leNoCorrespondenCount">0</p>
+        </div>
+    </div>
+    </div>
+
+    <div class="results-section card">
+        <h3>3. Resultados de la Lectura Actual</h3>
+        <table id="tableLEResults">
+            <thead>
+            <tr>
+                <th>ID Evento</th>
+                <th>EPC</th>
+                <th>Hora Evento</th>
+                <th>Tipo Evento</th>
+                <th>Estado Semáforo</th>
+                <th>RSSI</th>
+                <th>Antena</th>
+                <th>Ticket</th>
+                <th>Descripción</th>
+                <th>Acciones</th>
+            </tr>
+            </thead>
+            <tbody id="tableBodyLEResults">
+            </tbody>
+        </table>
+    </div>
+</div>

@@ -1,0 +1,15 @@
+<div id="conteoScreenView">
+    <h2>Lectura RFID - Conteo por Cantidad</h2>
+    <div class="controls">
+        <label for="targetCountInput">Cantidad Objetivo:</label>
+        <input type="number" id="targetCountInput" value="0" min="0">
+    </div>
+    <div class="controls">
+        <button id="btnStartConteo">Empezar Lectura</button>
+        <button id="btnStopConteo" disabled>Detener Lectura</button>
+    </div>
+    <div class="status-display">
+        <p>Tags Leídos (Únicos): <span id="conteoCurrentRead">0</span></p>
+        <p>Faltantes / Exceso: <span id="conteoRemainingOrExcess">0</span> (Objetivo: <span id="conteoTargetDisplay">0</span>)</p>
+    </div>
+</div>

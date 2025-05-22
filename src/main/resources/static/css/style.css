@@ -1,0 +1,285 @@
+body {
+    font-family: Arial, sans-serif;
+    display: flex;
+    margin: 0;
+    height: 100vh;
+    overflow: hidden;
+}
+
+#sidebar-container {
+    width: 220px;
+    background-color: #f4f4f4;
+    padding: 15px;
+    height: 100%;
+    border-right: 1px solid #ddd;
+    box-sizing: border-box;
+    flex-shrink: 0;
+}
+
+.sidebar-content h2 {
+    margin-top: 0;
+    font-size: 1.2em;
+    color: #333;
+}
+
+.sidebar-content ul {
+    list-style-type: none;
+    padding: 0;
+}
+
+.sidebar-content ul li a {
+    display: block;
+    padding: 10px;
+    text-decoration: none;
+    color: #337ab7;
+    border-radius: 4px;
+    margin-bottom: 5px;
+}
+
+.sidebar-content ul li a:hover, .sidebar-content ul li a.active {
+    background-color: #e9e9e9;
+    color: #23527c;
+}
+
+.main-content-area {
+    flex-grow: 1;
+    padding: 20px;
+    overflow-y: auto;
+    height: 100%;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+}
+
+#status-bar {
+    padding-bottom: 10px;
+    margin-bottom: 10px;
+    font-size: 0.9em;
+    color: #555;
+    border-bottom: 1px solid #eee;
+    flex-shrink: 0;
+}
+
+#status-bar span {
+    margin-right: 15px;
+}
+
+#screen-placeholder {
+    flex-grow: 1;
+    overflow-y: auto;
+}
+
+#entradaSalidaScreenView,
+#listaEsperadaScreenView,
+#conteoScreenView {
+    padding: 5px;
+}
+
+#entradaSalidaScreenView h2,
+#listaEsperadaScreenView h2,
+#conteoScreenView h2 {
+    margin-top: 0;
+    color: #333;
+    font-size: 1.5em;
+    margin-bottom: 15px;
+}
+
+.controls {
+    margin-bottom: 20px;
+    padding-bottom: 15px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+/* Si los controles de lista_esperada están dentro de un card,
+   el card ya tiene un borde y padding, por lo que podemos quitar el borde inferior de .controls aquí */
+#listaEsperadaScreenView .card .controls {
+    border-bottom: none;
+    padding-bottom: 0;
+    margin-bottom: 0; /* El card ya da el margen inferior */
+}
+
+
+.controls button, .controls input, .controls label, .controls textarea {
+    padding: 8px 12px;
+    font-size: 0.9em;
+    border-radius: 4px;
+    border: 1px solid #ccc;
+}
+
+/* Estilo base para botones de acción (verde por defecto) */
+.controls button {
+    background-color: #5cb85c;
+    color: white;
+    border-color: #4cae4c;
+    cursor: pointer;
+}
+.controls button:hover {
+    background-color: #4cae4c;
+}
+.controls button:disabled {
+    background-color: #d3d3d3;
+    border-color: #c0c0c0;
+    cursor: not-allowed;
+    opacity: 0.7; /* Para que se vean más claramente deshabilitados */
+}
+
+/* Botones de detener (Stop) - Rojo */
+.controls button#btnStopES,
+.controls button#btnStopLE,
+.controls button#btnStopConteo {
+    background-color: #d9534f;
+    border-color: #d43f3a;
+}
+.controls button#btnStopES:hover,
+.controls button#btnStopLE:hover,
+.controls button#btnStopConteo:hover {
+    background-color: #c9302c;
+}
+
+/* Botón de Limpiar (Clear) - Gris */
+.controls button#btnClearES,
+.controls button#btnClearLE {
+    background-color: #6c757d;
+    border-color: #5a6268;
+}
+.controls button#btnClearES:hover,
+.controls button#btnClearLE:hover {
+    background-color: #5a6268;
+}
+
+/* Botones de Exportar CSV (Amarillo) - Aplicable a ambas pantallas */
+.controls button#btnExportCsvES, /* Para pantalla Entrada/Salida */
+.controls button#btnExportCsvLE  /* Para pantalla Lista Esperada */
+{
+    background-color: #ffc107;
+    color: #212529;
+    border-color: #ffac07;
+}
+.controls button#btnExportCsvES:hover,
+.controls button#btnExportCsvLE:hover {
+    background-color: #e0a800;
+    border-color: #d39e00;
+}
+
+
+.controls input[type="number"] {
+    width: 80px;
+}
+.controls textarea#epcListTextareaLE {
+    width: 100%;
+    min-height: 80px;
+    box-sizing: border-box;
+    font-family: monospace;
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 15px;
+}
+
+table th, table td {
+    border: 1px solid #ddd;
+    padding: 10px;
+    text-align: left;
+    font-size: 0.9em;
+}
+
+table th {
+    background-color: #f0f0f0;
+    font-weight: bold;
+    color: #333;
+}
+
+table tbody tr:nth-child(even) {
+    background-color: #f9f9f9;
+}
+table tbody tr:hover {
+    background-color: #f1f1f1;
+}
+
+#conteoScreenView .status-display {
+    padding: 15px;
+    background-color: #e9f7fd;
+    border: 1px solid #bce8f1;
+    border-radius: 4px;
+    margin-top: 15px;
+}
+#conteoScreenView .status-display p {
+    margin: 5px 0;
+    font-size: 1.1em;
+}
+#conteoScreenView .status-display span {
+    font-weight: bold;
+}
+
+.card {
+    background-color: #fff;
+    border: 1px solid #e0e0e0;
+    border-radius: 5px;
+    padding: 20px;
+    margin-bottom: 20px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.08);
+}
+
+.card h3 {
+    margin-top: 0;
+    font-size: 1.3em;
+    color: #337ab7;
+    border-bottom: 1px solid #e9e9e9;
+    padding-bottom: 10px;
+    margin-bottom: 20px;
+}
+
+.status-boxes {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 15px;
+    margin-top: 15px;
+    margin-bottom: 10px;
+}
+
+.status-box {
+    flex: 1;
+    min-width: 150px;
+    border: 1px solid #eee;
+    border-radius: 4px;
+    padding: 15px;
+    text-align: center;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+    color: white;
+}
+
+.status-box h4 {
+    margin-top: 0;
+    margin-bottom: 8px;
+    font-size: 0.95em;
+    font-weight: 600;
+}
+
+.status-box p {
+    margin-bottom: 0;
+    font-size: 1.8em;
+    font-weight: bold;
+}
+
+/* Colores de fondo para status-box en lista_esperada.html */
+#listaEsperadaScreenView .status-boxes .status-box:nth-child(1) { /* Esperados */
+    background-color: #337ab7; /* Azul */
+}
+#listaEsperadaScreenView .status-boxes .status-box:nth-child(2) { /* Leídos (Coinciden) */
+    background-color: #5cb85c; /* Verde */
+}
+#listaEsperadaScreenView .status-boxes .status-box:nth-child(3) { /* Pendientes */
+    background-color: #d9534f; /* Rojo */
+}
+#listaEsperadaScreenView .status-boxes .status-box:nth-child(4) { /* No Corresponden */
+    background-color: #ffc107; /* Amarillo */
+    color: #333;
+}
+#listaEsperadaScreenView .status-boxes .status-box:nth-child(4) h4,
+#listaEsperadaScreenView .status-boxes .status-box:nth-child(4) p {
+    color: #333;
+}
