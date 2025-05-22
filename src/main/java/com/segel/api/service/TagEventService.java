@@ -2,9 +2,12 @@ package com.segel.api.service;
 
 import com.segel.api.dto.RfidEventDetailDTO;
 import com.segel.api.dto.TagEventDTO;
+import com.segel.api.model.RfidEventEntity; // Importar RfidEventEntity
+import com.segel.api.persistence.RfidEventRepository; // Importar RfidEventRepository
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional; // Importar Transactional
 
 import com.rscja.deviceapi.RFIDWithUHFNetworkUR4;
 import com.rscja.deviceapi.entity.UHFTAGInfo;
@@ -22,6 +25,7 @@ public class TagEventService {
     private final EntradaSalidaLogicService entradaSalidaLogicService;
     private final ListVerificationLogicService listVerificationLogicService;
     private final QuantityCountingLogicService quantityCountingLogicService;
+    private final RfidEventRepository rfidEventRepository; // Inyectar RfidEventRepository
 
     private final RFIDWithUHFNetworkUR4 rfidReader;
     private final AtomicBoolean isReading = new AtomicBoolean(false);
@@ -38,10 +42,12 @@ public class TagEventService {
     @Autowired
     public TagEventService(EntradaSalidaLogicService entradaSalidaLogicService,
                            ListVerificationLogicService listVerificationLogicService,
-                           QuantityCountingLogicService quantityCountingLogicService) {
+                           QuantityCountingLogicService quantityCountingLogicService,
+                           RfidEventRepository rfidEventRepository) { // Añadir RfidEventRepository
         this.entradaSalidaLogicService = entradaSalidaLogicService;
         this.listVerificationLogicService = listVerificationLogicService;
         this.quantityCountingLogicService = quantityCountingLogicService;
+        this.rfidEventRepository = rfidEventRepository; // Asignar
 
         this.rfidReader = new RFIDWithUHFNetworkUR4();
         System.out.println("DEBUG: Instancia de RFIDWithUHFNetworkUR4 creada en TagEventService.");
@@ -226,27 +232,45 @@ public class TagEventService {
         return status;
     }
 
-    // --- NUEVO MÉTODO PARA GENERAR REPORTE CSV ---
     public String generateCsvReportForCurrentMode() {
         if (isReading.get()) {
             System.err.println("WARN: No se puede generar el reporte mientras la lectura está activa.");
-            return "Error: Detenga la lectura antes de generar el reporte."; // O lanzar una excepción
+            return "Error: Detenga la lectura antes de generar el reporte.";
         }
-
         switch (currentOperatingMode) {
             case ENTRADA_SALIDA:
                 return entradaSalidaLogicService.generateCsvReportString();
             case LIST_VERIFICATION:
-                // return listVerificationLogicService.generateCsvReportString(); // A implementar en ListVerificationLogicService
+                // return listVerificationLogicService.generateCsvReportString(); // A implementar
                 System.out.println("WARN: Generación de CSV para Modo Lista no implementada aún.");
                 return "Reporte CSV para Modo Lista no implementado.";
             case QUANTITY_COUNTING:
-                // return quantityCountingLogicService.generateCsvReportString(); // A implementar en QuantityCountingLogicService
+                // return quantityCountingLogicService.generateCsvReportString(); // A implementar
                 System.out.println("WARN: Generación de CSV para Modo Conteo no implementada aún.");
                 return "Reporte CSV para Modo Conteo no implementado.";
             default:
                 System.out.println("WARN: No hay un modo activo o el modo no soporta reportes CSV.");
                 return "Error: No hay datos para generar el reporte o el modo no es compatible.";
+        }
+    }
+
+    // --- NUEVO MÉTODO PARA ACTUALIZAR DESCRIPCIÓN ---
+    @Transactional
+    public boolean updateEventDescription(Long eventId, String newDescription) {
+        if (eventId == null) {
+            System.err.println("ERROR: eventId es nulo al intentar actualizar descripción.");
+            return false;
+        }
+        Optional<RfidEventEntity> eventOptional = rfidEventRepository.findById(eventId);
+        if (eventOptional.isPresent()) {
+            RfidEventEntity event = eventOptional.get();
+            event.setDescripcion(newDescription);
+            rfidEventRepository.save(event);
+            System.out.println("INFO: Descripción actualizada para evento ID " + eventId + " a: \"" + newDescription + "\"");
+            return true;
+        } else {
+            System.err.println("WARN: Evento con ID " + eventId + " no encontrado para actualizar descripción.");
+            return false;
         }
     }
 

@@ -3,8 +3,14 @@
 
     <div class="controls card">
         <h3>1. Cargar Lista de EPCs Esperados</h3>
-        <label for="epcListTextareaLE">Pegue los EPCs (uno por línea):</label>
-        <textarea id="epcListTextareaLE" rows="5" placeholder="EPC001&#10;EPC002&#10;EPC003"></textarea>
+        <br>
+        <div>
+            <label for="epcListTextareaLE">Pegue los EPCs (uno por línea) O seleccione
+                un archivo .txt para cargar EPCs: <input type="file" id="epcFileLE" accept=".txt"> </label>
+            <textarea id="epcListTextareaLE" rows="5" placeholder="EPC001&#10;EPC002&#10;EPC003"></textarea>
+
+        </div>
+
         <button id="btnLoadAndPrepareLE">Cargar y Preparar Lista</button>
     </div>
 
