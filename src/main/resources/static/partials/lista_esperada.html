@@ -8,9 +8,7 @@
             <label for="epcListTextareaLE">Pegue los EPCs (uno por línea) O seleccione
                 un archivo .txt para cargar EPCs: <input type="file" id="epcFileLE" accept=".txt"> </label>
             <textarea id="epcListTextareaLE" rows="5" placeholder="EPC001&#10;EPC002&#10;EPC003"></textarea>
-
         </div>
-
         <button id="btnLoadAndPrepareLE">Cargar y Preparar Lista</button>
     </div>
 
@@ -19,24 +17,25 @@
         <button id="btnStartLE" disabled>Empezar Lectura de Lista</button>
         <button id="btnStopLE" disabled>Detener Lectura</button>
         <button id="btnClearLE" disabled>Limpiar Sesión Actual</button>
-        <button id="btnExportCsvLE">Exportar CSV</button> <div class="status-boxes">
-        <div class="status-box">
-            <h4>Esperados</h4>
-            <p id="leEsperadosCount">0</p>
+        <button id="btnExportCsvLE">Exportar CSV</button>
+        <div class="status-boxes">
+            <div class="status-box">
+                <h4>Esperados</h4>
+                <p id="leEsperadosCount">0</p>
+            </div>
+            <div class="status-box">
+                <h4>Leídos (Coinciden)</h4>
+                <p id="leLeidosCoincidenCount">0</p>
+            </div>
+            <div class="status-box">
+                <h4>Pendientes</h4>
+                <p id="lePendientesCount">0</p>
+            </div>
+            <div class="status-box">
+                <h4>No Corresponden</h4>
+                <p id="leNoCorrespondenCount">0</p>
+            </div>
         </div>
-        <div class="status-box">
-            <h4>Leídos (Coinciden)</h4>
-            <p id="leLeidosCoincidenCount">0</p>
-        </div>
-        <div class="status-box">
-            <h4>Pendientes</h4>
-            <p id="lePendientesCount">0</p>
-        </div>
-        <div class="status-box">
-            <h4>No Corresponden</h4>
-            <p id="leNoCorrespondenCount">0</p>
-        </div>
-    </div>
     </div>
 
     <div class="results-section card">
@@ -57,6 +56,24 @@
             </tr>
             </thead>
             <tbody id="tableBodyLEResults">
+            </tbody>
+        </table>
+    </div>
+
+    <div class="history-section card">
+        <h3>4. Resumen de Sesiones de Lectura de Lista</h3>
+        <table id="tableLESessionHistory">
+            <thead>
+            <tr>
+                <th>Fecha y Hora Inicio</th>
+                <th>Total Esperados</th>
+                <th>Total Coincidentes</th>
+                <th>Total Pendientes</th>
+                <th>Total No Corresponden</th>
+                <th>Acciones</th>
+            </tr>
+            </thead>
+            <tbody id="tableBodyLESessionHistory">
             </tbody>
         </table>
     </div>

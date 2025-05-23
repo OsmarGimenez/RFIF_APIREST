@@ -11,18 +11,17 @@ public class RfidEventEntity {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false, length = 128) // Asumiendo que EPC no puede ser nulo
+    @Column(nullable = false, length = 128)
     private String epc;
 
-    // Relación con TipoEventoEntity
-    @ManyToOne(fetch = FetchType.LAZY) // LAZY es generalmente bueno para el rendimiento
-    @JoinColumn(name = "id_tipo_evento", nullable = true) // Nombre de la columna FK en rfid_events. 'nullable = true' si un evento podría no tener tipo (ajusta según tu lógica)
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "id_tipo_evento", nullable = true)
     private TipoEventoEntity tipoEvento;
 
     @Column(name = "event_time")
     private LocalDateTime eventTime;
 
-    @Column(length = 15) // Ajustado de VARCHAR(10) a VARCHAR(15) para rssi
+    @Column(length = 15)
     private String rssi;
 
     @Column(length = 10)
@@ -37,12 +36,19 @@ public class RfidEventEntity {
     @Column(name = "descripcion", columnDefinition = "TEXT")
     private String descripcion;
 
+    // --- NUEVA RELACIÓN CON LecturaListaSesionEntity ---
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "sesion_id", nullable = true) // 'sesion_id' es la FK en la tabla rfid_events
+    private LecturaListaSesionEntity sesion; // Referencia a la entidad de la sesión
+
     // Constructor vacío
     public RfidEventEntity() {
     }
 
-    // Constructor actualizado (ejemplo)
-    public RfidEventEntity(String epc, TipoEventoEntity tipoEvento, LocalDateTime eventTime, String rssi, String antenna, String ticket, String estadoColor, String descripcion) {
+    // Constructor para cuando se crea un evento sin una sesión de lista específica
+    public RfidEventEntity(String epc, TipoEventoEntity tipoEvento, LocalDateTime eventTime,
+                           String rssi, String antenna, String ticket,
+                           String estadoColor, String descripcion) {
         this.epc = epc;
         this.tipoEvento = tipoEvento;
         this.eventTime = eventTime;
@@ -51,9 +57,26 @@ public class RfidEventEntity {
         this.ticket = ticket;
         this.estadoColor = estadoColor;
         this.descripcion = descripcion;
+        this.sesion = null; // Por defecto, no pertenece a una sesión de lista específica
     }
 
-    // Getters y Setters
+    // Constructor completo (opcional, o usar setters)
+    public RfidEventEntity(String epc, TipoEventoEntity tipoEvento, LocalDateTime eventTime,
+                           String rssi, String antenna, String ticket,
+                           String estadoColor, String descripcion, LecturaListaSesionEntity sesion) {
+        this.epc = epc;
+        this.tipoEvento = tipoEvento;
+        this.eventTime = eventTime;
+        this.rssi = rssi;
+        this.antenna = antenna;
+        this.ticket = ticket;
+        this.estadoColor = estadoColor;
+        this.descripcion = descripcion;
+        this.sesion = sesion; // Asignar la sesión
+    }
+
+
+    // --- GETTERS Y SETTERS ---
     public Long getId() {
         return id;
     }
@@ -124,5 +147,13 @@ public class RfidEventEntity {
 
     public void setDescripcion(String descripcion) {
         this.descripcion = descripcion;
+    }
+
+    public LecturaListaSesionEntity getSesion() {
+        return sesion;
+    }
+
+    public void setSesion(LecturaListaSesionEntity sesion) {
+        this.sesion = sesion;
     }
 }

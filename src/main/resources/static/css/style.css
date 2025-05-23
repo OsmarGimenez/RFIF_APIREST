@@ -77,7 +77,7 @@ body {
 
 #entradaSalidaScreenView h2,
 #listaEsperadaScreenView h2,
-#conteoScreenView h2 {
+#conteoScreenView h2 { /* Estilo general para títulos de pantalla */
     margin-top: 0;
     color: #333;
     font-size: 1.5em;
@@ -90,14 +90,13 @@ body {
     display: flex;
     flex-wrap: wrap;
     gap: 10px;
+    align-items: center; /* Para alinear mejor items en la misma línea, como label e input */
 }
 
-/* Si los controles de lista_esperada están dentro de un card,
-   el card ya tiene un borde y padding, por lo que podemos quitar el borde inferior de .controls aquí */
 #listaEsperadaScreenView .card .controls {
     border-bottom: none;
     padding-bottom: 0;
-    margin-bottom: 0; /* El card ya da el margen inferior */
+    margin-bottom: 0;
 }
 
 
@@ -108,7 +107,6 @@ body {
     border: 1px solid #ccc;
 }
 
-/* Estilo base para botones de acción (verde por defecto) */
 .controls button {
     background-color: #5cb85c;
     color: white;
@@ -122,10 +120,9 @@ body {
     background-color: #d3d3d3;
     border-color: #c0c0c0;
     cursor: not-allowed;
-    opacity: 0.7; /* Para que se vean más claramente deshabilitados */
+    opacity: 0.7;
 }
 
-/* Botones de detener (Stop) - Rojo */
 .controls button#btnStopES,
 .controls button#btnStopLE,
 .controls button#btnStopConteo {
@@ -138,7 +135,6 @@ body {
     background-color: #c9302c;
 }
 
-/* Botón de Limpiar (Clear) - Gris */
 .controls button#btnClearES,
 .controls button#btnClearLE {
     background-color: #6c757d;
@@ -149,10 +145,8 @@ body {
     background-color: #5a6268;
 }
 
-/* Botones de Exportar CSV (Amarillo) - Aplicable a ambas pantallas */
-.controls button#btnExportCsvES, /* Para pantalla Entrada/Salida */
-.controls button#btnExportCsvLE  /* Para pantalla Lista Esperada */
-{
+.controls button#btnExportCsvES,
+.controls button#btnExportCsvLE {
     background-color: #ffc107;
     color: #212529;
     border-color: #ffac07;
@@ -266,17 +260,16 @@ table tbody tr:hover {
     font-weight: bold;
 }
 
-/* Colores de fondo para status-box en lista_esperada.html */
-#listaEsperadaScreenView .status-boxes .status-box:nth-child(1) { /* Esperados */
+#listaEsperadaScreenView .status-boxes .status-box:nth-child(1) {
     background-color: #337ab7; /* Azul */
 }
-#listaEsperadaScreenView .status-boxes .status-box:nth-child(2) { /* Leídos (Coinciden) */
+#listaEsperadaScreenView .status-boxes .status-box:nth-child(2) {
     background-color: #5cb85c; /* Verde */
 }
-#listaEsperadaScreenView .status-boxes .status-box:nth-child(3) { /* Pendientes */
+#listaEsperadaScreenView .status-boxes .status-box:nth-child(3) {
     background-color: #d9534f; /* Rojo */
 }
-#listaEsperadaScreenView .status-boxes .status-box:nth-child(4) { /* No Corresponden */
+#listaEsperadaScreenView .status-boxes .status-box:nth-child(4) {
     background-color: #ffc107; /* Amarillo */
     color: #333;
 }
@@ -285,5 +278,106 @@ table tbody tr:hover {
     color: #333;
 }
 input#epcFileLE{
-border:none
+    border:none
+}
+
+/* --- ESTILOS PARA EL MODAL DE DETALLE DE SESIÓN --- */
+.modal-overlay {
+    display: none;
+    position: fixed;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+    z-index: 1000;
+    justify-content: center;
+    align-items: center;
+}
+
+.modal-content {
+    background-color: #fff;
+    padding: 25px;
+    border-radius: 8px;
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+    width: 90%; /* Ancho del modal aumentado */
+    max-width: 1100px; /* Ancho máximo aumentado */
+    max-height: 90vh;
+    overflow-y: auto;
+    position: relative;
+}
+
+.modal-close-button {
+    position: absolute;
+    top: 10px;
+    right: 15px;
+    font-size: 2em;
+    font-weight: bold;
+    color: #aaa;
+    cursor: pointer;
+}
+.modal-close-button:hover {
+    color: #333;
+}
+
+/* Contenedor para el título del modal y el botón de exportar */
+.modal-header-container {
+    display: flex;
+    justify-content: space-between; /* Título a la izq, botón a la der */
+    align-items: center; /* Centrar verticalmente */
+    margin-bottom: 20px;
+}
+
+.modal-header-container h2 {
+    margin-top: 0;
+    color: #337ab7;
+    font-size: 1.6em;
+    margin-bottom: 0; /* Quitar margen inferior si está en flex container */
+}
+
+/* Estilo para el botón de exportar CSV dentro del modal */
+.modal-header-container button#btnExportCsvModalDetalle {
+    background-color: #ffc107; /* Amarillo */
+    color: #212529;    /* Texto oscuro */
+    border-color: #ffac07;
+    padding: 8px 12px; /* Consistente con otros botones */
+    font-size: 0.9em;  /* Consistente con otros botones */
+    border-radius: 4px;/* Consistente con otros botones */
+    cursor: pointer;
+}
+.modal-header-container button#btnExportCsvModalDetalle:hover {
+    background-color: #e0a800;
+    border-color: #d39e00;
+}
+
+
+.modal-content h3 { /* Título para la tabla de tags procesados */
+    margin-top: 20px;
+    font-size: 1.2em;
+    color: #444;
+    border-bottom: 1px solid #eee;
+    padding-bottom: 8px;
+    margin-bottom: 10px;
+}
+
+.session-summary-modal p {
+    margin: 5px 0;
+    font-size: 0.95em;
+}
+.session-summary-modal p strong {
+    display: inline-block;
+    width: 180px;
+    color: #555;
+}
+
+.table-container-modal {
+    max-height: 400px;
+    overflow-y: auto;
+    border: 1px solid #eee;
+    margin-top: 10px;
+}
+
+#tableModalDetalleSesion .action-button {
+    padding: 5px 10px;
+    font-size: 0.85em;
 }

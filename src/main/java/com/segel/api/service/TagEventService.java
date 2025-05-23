@@ -2,22 +2,29 @@ package com.segel.api.service;
 
 import com.segel.api.dto.RfidEventDetailDTO;
 import com.segel.api.dto.TagEventDTO;
-import com.segel.api.model.RfidEventEntity; // Importar RfidEventEntity
-import com.segel.api.persistence.RfidEventRepository; // Importar RfidEventRepository
+import com.segel.api.model.LecturaListaSesionEntity;
+import com.segel.api.model.RfidEventEntity;
+import com.segel.api.model.TipoEventoEntity;
+import com.segel.api.persistence.LecturaListaSesionRepository;
+import com.segel.api.persistence.RfidEventRepository;
+import com.segel.api.persistence.TipoEventoRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional; // Importar Transactional
+import org.springframework.transaction.annotation.Transactional;
 
 import com.rscja.deviceapi.RFIDWithUHFNetworkUR4;
 import com.rscja.deviceapi.entity.UHFTAGInfo;
 
 import jakarta.annotation.PreDestroy;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter; // Importar para el formateador de CSV
 import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.stream.Collectors;
 
 @Service
 public class TagEventService {
@@ -25,13 +32,17 @@ public class TagEventService {
     private final EntradaSalidaLogicService entradaSalidaLogicService;
     private final ListVerificationLogicService listVerificationLogicService;
     private final QuantityCountingLogicService quantityCountingLogicService;
-    private final RfidEventRepository rfidEventRepository; // Inyectar RfidEventRepository
+    private final RfidEventRepository rfidEventRepository;
+    private final LecturaListaSesionRepository lecturaListaSesionRepository;
 
     private final RFIDWithUHFNetworkUR4 rfidReader;
     private final AtomicBoolean isReading = new AtomicBoolean(false);
     private ExecutorService readerExecutorService;
     private OperatingMode currentOperatingMode = OperatingMode.IDLE;
     private long readingStartTimeMillis = 0L;
+
+    private static final DateTimeFormatter CSV_DATE_TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+
 
     @Value("${reader.ip}")
     private String readerIp;
@@ -43,11 +54,13 @@ public class TagEventService {
     public TagEventService(EntradaSalidaLogicService entradaSalidaLogicService,
                            ListVerificationLogicService listVerificationLogicService,
                            QuantityCountingLogicService quantityCountingLogicService,
-                           RfidEventRepository rfidEventRepository) { // Añadir RfidEventRepository
+                           RfidEventRepository rfidEventRepository,
+                           LecturaListaSesionRepository lecturaListaSesionRepository) {
         this.entradaSalidaLogicService = entradaSalidaLogicService;
         this.listVerificationLogicService = listVerificationLogicService;
         this.quantityCountingLogicService = quantityCountingLogicService;
-        this.rfidEventRepository = rfidEventRepository; // Asignar
+        this.rfidEventRepository = rfidEventRepository;
+        this.lecturaListaSesionRepository = lecturaListaSesionRepository;
 
         this.rfidReader = new RFIDWithUHFNetworkUR4();
         System.out.println("DEBUG: Instancia de RFIDWithUHFNetworkUR4 creada en TagEventService.");
@@ -65,7 +78,6 @@ public class TagEventService {
             System.out.println("INFO: Re-estableciendo el mismo modo: " + newMode + ". No se limpian los estados en memoria de la lógica.");
         }
         this.currentOperatingMode = newMode;
-        System.out.println("INFO: Modo de operación establecido a: " + newMode);
 
         switch (newMode) {
             case LIST_VERIFICATION:
@@ -73,14 +85,14 @@ public class TagEventService {
                     try {
                         @SuppressWarnings("unchecked")
                         List<String> epcs = (List<String>) params;
-                        listVerificationLogicService.setExpectedEPCs(epcs);
+                        listVerificationLogicService.prepareNewListSession(epcs);
                     } catch (ClassCastException e) {
                         System.err.println("ERROR: Parámetro incorrecto para LIST_VERIFICATION. Se esperaba List<String>.");
                         this.currentOperatingMode = OperatingMode.IDLE;
                         return false;
                     }
                 } else {
-                    System.err.println("ERROR: Modo LIST_VERIFICATION requiere una lista de EPCs como parámetro.");
+                    System.err.println("ERROR: Modo LIST_VERIFICATION requiere una lista de EPCs como parámetro al establecer el modo.");
                     this.currentOperatingMode = OperatingMode.IDLE;
                     return false;
                 }
@@ -98,6 +110,7 @@ public class TagEventService {
             case IDLE:
                 break;
         }
+        System.out.println("INFO: Modo de operación establecido a: " + newMode);
         return true;
     }
 
@@ -109,6 +122,14 @@ public class TagEventService {
         if (this.currentOperatingMode == OperatingMode.IDLE) {
             System.err.println("ERROR: No se ha establecido un modo de operación.");
             return;
+        }
+        if (this.currentOperatingMode == OperatingMode.LIST_VERIFICATION) {
+            boolean sessionStarted = listVerificationLogicService.startCurrentListSession();
+            if (!sessionStarted) {
+                System.err.println("ERROR: No se pudo iniciar la sesión de lista en ListVerificationLogicService.");
+                isReading.set(false);
+                return;
+            }
         }
         if (isReading.compareAndSet(false, true)) {
             readingStartTimeMillis = System.currentTimeMillis();
@@ -159,22 +180,31 @@ public class TagEventService {
                     this.rfidReader.free();
                     System.out.println("INFO: Recursos del lector liberados.");
                     readingStartTimeMillis = 0L;
+                    if (currentOperatingMode == OperatingMode.LIST_VERIFICATION) {
+                        listVerificationLogicService.concludeCurrentListSession();
+                    }
                 });
             } catch (Exception e) {
                 System.err.println("ERROR: Excepción al iniciar lector: " + e.getMessage());
                 e.printStackTrace(); isReading.set(false); readingStartTimeMillis = 0L;
             }
-        } else { System.out.println("INFO: Lectura ya en progreso para modo: " + currentOperatingMode); }
+        } else {
+            if(isReading.get()){
+                System.out.println("INFO: Lectura ya en progreso para modo: " + currentOperatingMode);
+            }
+        }
     }
 
     public void stopReading() {
+        OperatingMode modeWhenStopping = this.currentOperatingMode;
         if (isReading.compareAndSet(true, false)) {
-            System.out.println("INFO: Solicitud para detener lectura (Modo: " + currentOperatingMode + ").");
+            System.out.println("INFO: Solicitud para detener lectura (Modo: " + modeWhenStopping + ").");
             if (readerExecutorService != null && !readerExecutorService.isShutdown()) {
                 readerExecutorService.shutdown();
                 try {
-                    if (!readerExecutorService.awaitTermination(5, TimeUnit.SECONDS)) {
+                    if (!readerExecutorService.awaitTermination(7, TimeUnit.SECONDS)) {
                         readerExecutorService.shutdownNow();
+                        System.err.println("WARN: El servicio de lector no terminó tareas pendientes, forzando apagado del hilo.");
                     }
                 } catch (InterruptedException ie) {
                     readerExecutorService.shutdownNow(); Thread.currentThread().interrupt();
@@ -191,7 +221,7 @@ public class TagEventService {
 
     private void clearAllLogicStates() {
         entradaSalidaLogicService.clearState();
-        listVerificationLogicService.clearState();
+        listVerificationLogicService.clearStateForNewSession();
         quantityCountingLogicService.clearState();
         System.out.println("INFO: Estados de todas las lógicas limpiados.");
     }
@@ -200,7 +230,7 @@ public class TagEventService {
         System.out.println("INFO: Limpiando estado para modo actual: " + currentOperatingMode);
         switch (currentOperatingMode) {
             case ENTRADA_SALIDA: entradaSalidaLogicService.clearState(); break;
-            case LIST_VERIFICATION: listVerificationLogicService.clearState(); break;
+            case LIST_VERIFICATION: listVerificationLogicService.clearStateForNewSession(); break;
             case QUANTITY_COUNTING: quantityCountingLogicService.clearState(); break;
             default: clearAllLogicStates(); break;
         }
@@ -241,11 +271,8 @@ public class TagEventService {
             case ENTRADA_SALIDA:
                 return entradaSalidaLogicService.generateCsvReportString();
             case LIST_VERIFICATION:
-                // return listVerificationLogicService.generateCsvReportString(); // A implementar
-                System.out.println("WARN: Generación de CSV para Modo Lista no implementada aún.");
-                return "Reporte CSV para Modo Lista no implementado.";
+                return listVerificationLogicService.generateCsvReportString();
             case QUANTITY_COUNTING:
-                // return quantityCountingLogicService.generateCsvReportString(); // A implementar
                 System.out.println("WARN: Generación de CSV para Modo Conteo no implementada aún.");
                 return "Reporte CSV para Modo Conteo no implementado.";
             default:
@@ -254,18 +281,17 @@ public class TagEventService {
         }
     }
 
-    // --- NUEVO MÉTODO PARA ACTUALIZAR DESCRIPCIÓN ---
     @Transactional
     public boolean updateEventDescription(Long eventId, String newDescription) {
         if (eventId == null) {
             System.err.println("ERROR: eventId es nulo al intentar actualizar descripción.");
             return false;
         }
-        Optional<RfidEventEntity> eventOptional = rfidEventRepository.findById(eventId);
+        Optional<RfidEventEntity> eventOptional = this.rfidEventRepository.findById(eventId);
         if (eventOptional.isPresent()) {
             RfidEventEntity event = eventOptional.get();
             event.setDescripcion(newDescription);
-            rfidEventRepository.save(event);
+            this.rfidEventRepository.save(event);
             System.out.println("INFO: Descripción actualizada para evento ID " + eventId + " a: \"" + newDescription + "\"");
             return true;
         } else {
@@ -274,7 +300,77 @@ public class TagEventService {
         }
     }
 
+    public List<LecturaListaSesionEntity> getAllListVerificationSessions() {
+        return lecturaListaSesionRepository.findAllByOrderByFechaHoraInicioDesc();
+    }
+
+    public List<RfidEventDetailDTO> getListVerificationSessionDetails(Long sesionId) {
+        if (sesionId == null) {
+            System.err.println("ERROR: sesionId es nulo al intentar obtener detalles de sesión.");
+            return Collections.emptyList();
+        }
+        List<RfidEventEntity> eventsInSession = rfidEventRepository.findBySesion_SesionIdOrderByEventTimeDesc(sesionId);
+        if (eventsInSession.isEmpty()) {
+            System.out.println("INFO: No se encontraron eventos para la sesión ID: " + sesionId);
+            return Collections.emptyList();
+        }
+        return eventsInSession.stream()
+                .map(eventEntity -> {
+                    TipoEventoEntity tipoEvento = eventEntity.getTipoEvento();
+                    return new RfidEventDetailDTO(
+                            eventEntity.getId(), eventEntity.getEpc(), eventEntity.getEventTime(),
+                            eventEntity.getRssi(), eventEntity.getAntenna(), eventEntity.getTicket(),
+                            eventEntity.getEstadoColor(), eventEntity.getDescripcion(),
+                            tipoEvento != null ? tipoEvento.getNombreEvento() : "Desconocido",
+                            tipoEvento != null ? tipoEvento.getDescripcionTipo() : "Sin descripción de tipo"
+                    );
+                })
+                .collect(Collectors.toList());
+    }
+
+    // --- NUEVO MÉTODO PARA GENERAR REPORTE CSV DE UNA SESIÓN HISTÓRICA ---
+    public String generateCsvReportForHistoricalSession(Long sesionId) {
+        if (sesionId == null) {
+            return "Error: ID de sesión no proporcionado para el reporte.";
+        }
+        List<RfidEventDetailDTO> eventDetails = getListVerificationSessionDetails(sesionId);
+        if (eventDetails.isEmpty()) {
+            return "Error: No hay eventos detallados para la sesión ID " + sesionId + " para generar el reporte.";
+        }
+
+        StringBuilder csvBuilder = new StringBuilder();
+        // Encabezado del CSV (igual al de la tabla del modal)
+        csvBuilder.append("ID Evento,EPC,Hora Evento,Tipo Evento,Estado Semáforo,RSSI,Antena,Ticket,Descripción\n");
+
+        for (RfidEventDetailDTO dto : eventDetails) {
+            csvBuilder.append(escapeCsvField(dto.getId() != null ? dto.getId().toString() : "")).append(",");
+            csvBuilder.append(escapeCsvField(dto.getEpc())).append(",");
+            csvBuilder.append(escapeCsvField(dto.getEventTime() != null ? dto.getEventTime().format(CSV_DATE_TIME_FORMATTER) : "")).append(",");
+            csvBuilder.append(escapeCsvField(dto.getNombreDelTipoDeEvento())).append(",");
+            csvBuilder.append(escapeCsvField(dto.getEstadoColor())).append(",");
+            csvBuilder.append(escapeCsvField(dto.getRssi())).append(",");
+            csvBuilder.append(escapeCsvField(dto.getAntenna())).append(",");
+            csvBuilder.append(escapeCsvField(dto.getTicket())).append(",");
+            csvBuilder.append(escapeCsvField(dto.getDescripcion()));
+            csvBuilder.append("\n");
+        }
+        return csvBuilder.toString();
+    }
+
+    // Método ayudante simple para escapar campos CSV (debe estar en la clase o ser accesible)
+    private String escapeCsvField(String data) {
+        if (data == null) {
+            return "";
+        }
+        String escapedData = data.replace("\"", "\"\"");
+        if (data.contains(",") || data.contains("\"") || data.contains("\n")) {
+            escapedData = "\"" + escapedData + "\"";
+        }
+        return escapedData;
+    }
+
     public void simulateTagRead(String epc, OperatingMode modeToSimulate) {
+        // ... (código existente)
         System.out.println("INFO: SIMULANDO LECTURA (Modo: " + modeToSimulate + ") PARA EPC: " + epc);
         String simulatedRssi = "-55dBm";
         String simulatedAntenna = "1";

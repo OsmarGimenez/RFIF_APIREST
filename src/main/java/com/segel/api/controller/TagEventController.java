@@ -2,7 +2,8 @@ package com.segel.api.controller;
 
 import com.segel.api.dto.RfidEventDetailDTO;
 import com.segel.api.dto.TagEventDTO;
-import com.segel.api.dto.UpdateDescriptionRequestDTO; // Importar el nuevo DTO
+import com.segel.api.dto.UpdateDescriptionRequestDTO;
+import com.segel.api.model.LecturaListaSesionEntity;
 import com.segel.api.service.OperatingMode;
 import com.segel.api.service.TagEventService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -10,8 +11,10 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
@@ -90,11 +93,46 @@ public class TagEventController {
         return ResponseEntity.ok(activityStatus);
     }
 
+    @PutMapping("/events/{eventId}/description")
+    public ResponseEntity<?> updateEventDescription(
+            @PathVariable Long eventId,
+            @RequestBody UpdateDescriptionRequestDTO request) {
+        try {
+            boolean updated = tagEventService.updateEventDescription(eventId, request.getDescripcion());
+            if (updated) {
+                return ResponseEntity.ok().body(Map.of("message", "Descripción actualizada correctamente."));
+            } else {
+                return ResponseEntity.notFound().build();
+            }
+        } catch (Exception e) {
+            System.err.println("Error al actualizar descripción para evento ID " + eventId + ": " + e.getMessage());
+            return ResponseEntity.internalServerError().body("Error al actualizar la descripción.");
+        }
+    }
+
+    // --- Endpoints para Historial de Sesiones de Lista ---
+    @GetMapping("/list-verification/sessions")
+    public ResponseEntity<List<LecturaListaSesionEntity>> getListVerificationSessions() {
+        List<LecturaListaSesionEntity> sessions = tagEventService.getAllListVerificationSessions();
+        return ResponseEntity.ok(sessions);
+    }
+
+    @GetMapping("/list-verification/sessions/{sesionId}/details")
+    public ResponseEntity<List<RfidEventDetailDTO>> getListVerificationSessionDetails(@PathVariable Long sesionId) {
+        List<RfidEventDetailDTO> eventDetails = tagEventService.getListVerificationSessionDetails(sesionId);
+        if (eventDetails == null) {
+            return ResponseEntity.ok(Collections.emptyList());
+        }
+        return ResponseEntity.ok(eventDetails);
+    }
+
+
+    // --- Endpoints de Reporte ---
     @GetMapping(value = "/report/entrada-salida/csv", produces = "text/csv")
     public ResponseEntity<String> getCsvReportEntradaSalida() {
         String csvData = tagEventService.generateCsvReportForCurrentMode();
-        if (csvData.startsWith("Error:") || csvData.contains("no implementado")) {
-            return ResponseEntity.badRequest().body("Error al generar el reporte CSV: " + csvData);
+        if (csvData.startsWith("Error:") || !csvData.contains("EPC")) {
+            return ResponseEntity.badRequest().body("Error al generar el reporte CSV para Entrada/Salida: " + csvData);
         }
         LocalDateTime now = LocalDateTime.now();
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss");
@@ -105,22 +143,41 @@ public class TagEventController {
         return ResponseEntity.ok().headers(headers).body(csvData);
     }
 
-    // --- NUEVO ENDPOINT PARA ACTUALIZAR DESCRIPCIÓN ---
-    @PutMapping("/events/{eventId}/description")
-    public ResponseEntity<?> updateEventDescription(
-            @PathVariable Long eventId,
-            @RequestBody UpdateDescriptionRequestDTO request) {
-        try {
-            boolean updated = tagEventService.updateEventDescription(eventId, request.getDescripcion());
-            if (updated) {
-                return ResponseEntity.ok().body(Map.of("message", "Descripción actualizada correctamente."));
-            } else {
-                return ResponseEntity.notFound().build(); // O un mensaje de error más específico
-            }
-        } catch (Exception e) {
-            // Loguear la excepción e.printStackTrace(); o con un logger
-            System.err.println("Error al actualizar descripción para evento ID " + eventId + ": " + e.getMessage());
-            return ResponseEntity.internalServerError().body("Error al actualizar la descripción.");
+    @GetMapping(value = "/report/list-verification/csv", produces = "text/csv")
+    public ResponseEntity<String> getCsvReportListVerification() {
+        // Este endpoint es para el reporte de la SESIÓN ACTUAL del modo LIST_VERIFICATION
+        String csvData = tagEventService.generateCsvReportForCurrentMode();
+        if (csvData.startsWith("Error:") || csvData.contains("no implementado") || !csvData.contains("EPC")) {
+            return ResponseEntity.badRequest().body("Error al generar el reporte CSV para la sesión actual de Verificación de Lista: " + csvData);
         }
+        LocalDateTime now = LocalDateTime.now();
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss");
+        String fileName = "reporte_sesion_actual_lista_" + now.format(formatter) + ".csv";
+        HttpHeaders headers = new HttpHeaders();
+        headers.add(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + fileName + "\"");
+        headers.add(HttpHeaders.CONTENT_TYPE, MediaType.TEXT_PLAIN_VALUE + "; charset=utf-8");
+        return ResponseEntity.ok().headers(headers).body(csvData);
+    }
+
+    // --- NUEVO ENDPOINT PARA REPORTE CSV DE UNA SESIÓN HISTÓRICA ESPECÍFICA ---
+    @GetMapping(value = "/list-verification/sessions/{sesionId}/report/csv", produces = "text/csv")
+    public ResponseEntity<String> getCsvReportForHistoricalSession(@PathVariable Long sesionId) {
+        String csvData = tagEventService.generateCsvReportForHistoricalSession(sesionId);
+
+        if (csvData == null || csvData.startsWith("Error:") || !csvData.contains("EPC")) {
+            return ResponseEntity.badRequest().body("Error al generar el reporte CSV para la sesión histórica ID " + sesionId + ": " + (csvData != null ? csvData : "Datos no encontrados."));
+        }
+
+        LocalDateTime now = LocalDateTime.now(); // O usar la fecha de la sesión para el nombre del archivo
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss");
+        String fileName = "reporte_sesion_historica_" + sesionId + "_" + now.format(formatter) + ".csv";
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.add(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + fileName + "\"");
+        headers.add(HttpHeaders.CONTENT_TYPE, MediaType.TEXT_PLAIN_VALUE + "; charset=utf-8");
+
+        return ResponseEntity.ok()
+                .headers(headers)
+                .body(csvData);
     }
 }

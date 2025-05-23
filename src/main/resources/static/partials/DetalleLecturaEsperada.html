@@ -1,0 +1,42 @@
+<div id="modalDetalleSesion" class="modal-overlay">
+    <div class="modal-content">
+        <span class="modal-close-button">&times;</span>
+
+        <div class="modal-header-container">
+            <h2>Detalle de Sesión de Lectura</h2>
+            <button id="btnExportCsvModalDetalle" class="action-button">Exportar CSV</button>
+        </div>
+
+        <div class="session-summary-modal">
+            <p><strong>ID Sesión:</strong> <span id="modalSesionId">N/A</span></p>
+            <p><strong>Fecha Inicio:</strong> <span id="modalFechaInicio">N/A</span></p>
+            <p><strong>Fecha Fin:</strong> <span id="modalFechaFin">N/A</span></p>
+            <p><strong>Esperados:</strong> <span id="modalTotalEsperado">0</span></p>
+            <p><strong>Coincidentes (Verdes):</strong> <span id="modalTotalCoincidentes">0</span></p>
+            <p><strong>Pendientes (Rojos):</strong> <span id="modalTotalPendientes">0</span></p>
+            <p><strong>No Corresponden (Amarillos):</strong> <span id="modalTotalNoCorresponden">0</span></p>
+        </div>
+
+        <h3>Tags Procesados en esta Sesión:</h3>
+        <div class="table-container-modal">
+            <table id="tableModalDetalleSesion">
+                <thead>
+                <tr>
+                    <th>ID Evento</th>
+                    <th>EPC</th>
+                    <th>Hora Evento</th>
+                    <th>Tipo Evento</th>
+                    <th>Estado Semáforo</th>
+                    <th>RSSI</th>
+                    <th>Antena</th>
+                    <th>Ticket</th>
+                    <th>Descripción</th>
+                    <th>Acciones</th>
+                </tr>
+                </thead>
+                <tbody id="tableBodyModalDetalleSesion">
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
