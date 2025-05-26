@@ -2,7 +2,6 @@ package com.segel.api.model;
 
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
-// import java.util.List; // Descomentar si añades la relación OneToMany con RfidEventEntity aquí
 
 @Entity
 @Table(name = "lectura_lista_sesion")

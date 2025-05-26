@@ -1,6 +1,6 @@
 // js/app.js
 document.addEventListener('DOMContentLoaded', () => {
-    window.API_BASE_URL = 'http://localhost:8080/api/tags'; // Ajusta si es necesario
+    window.API_BASE_URL = 'http://localhost:8080/api/tags';
 
     const sidebarContainer = document.getElementById('sidebar-container');
     const screenPlaceholder = document.getElementById('screen-placeholder');
@@ -10,7 +10,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const readingDurationElement = document.getElementById('readingDuration');
 
     window.globalIsReaderActive = false;
-    window.globalCurrentMode = "Ninguno"; // Representa el nombre del modo para la UI
+    window.globalCurrentMode = "Ninguno";
     let globalTimerInterval;
     let globalSecondsReading = 0;
 
@@ -24,13 +24,22 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     window.setGlobalReaderActive = function(isActive) {
-        if (window.globalIsReaderActive !== isActive) { // Solo actualiza si hay un cambio real
+        // Solo actualiza y llama a los demás si hay un cambio real
+        if (window.globalIsReaderActive !== isActive) {
             window.globalIsReaderActive = isActive;
-            if (!isActive) { // Si se detiene la lectura
+            if (!isActive) {
                 clearInterval(globalTimerInterval);
                 globalSecondsReading = 0;
+                // Actualizamos la duración a 0s inmediatamente en la UI si se detiene
+                if(readingDurationElement) readingDurationElement.textContent = '0s';
             }
-            // La barra de estado se actualizará cuando se llame a updateGlobalStatusBar
+            window.updateGlobalStatusBar(); // Actualiza la barra de estado después de cambiar el estado activo
+        } else if (!isActive && globalSecondsReading !== 0) {
+            // Si se llama con isActive = false pero ya estaba false, asegurarse que el timer esté limpio y en 0s.
+            clearInterval(globalTimerInterval);
+            globalSecondsReading = 0;
+            if(readingDurationElement) readingDurationElement.textContent = '0s';
+            window.updateGlobalStatusBar();
         }
     }
 
@@ -47,23 +56,27 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // Esta función es llamada por los botones de inicio de cada pantalla específica.
-    // El backend es la fuente de verdad para el modo de operación.
-    // Esta función de JS solo actualiza la UI.
     window.updateGlobalUIMode = function(uiModeName) {
-        window.globalCurrentMode = uiModeName;
+        // Esta función es principalmente para que los scripts de pantalla actualicen el modo en la UI.
+        // El modo real en el backend se establece a través de los endpoints de inicio.
+        if (window.globalCurrentMode !== uiModeName) {
+            window.globalCurrentMode = uiModeName;
+            console.log(`INFO: Modo UI global cambiado a: ${uiModeName}`);
+        }
         window.updateGlobalStatusBar();
     };
 
     // --- Carga Dinámica de HTML y Scripts ---
-    async function loadHTML(url, element) {
+    async function loadHTML(filePath, element) { // Renombrado para claridad
         try {
-            const response = await fetch(url);
-            if (!response.ok) throw new Error(`Error al cargar ${url}: ${response.status}`);
+            const response = await fetch(filePath); // Usar filePath directamente
+            if (!response.ok) throw new Error(`Error al cargar ${filePath}: ${response.status}`);
             element.innerHTML = await response.text();
+            return true; // Indicar éxito
         } catch (error) {
-            element.innerHTML = `<p style="color:red;">${error.message}</p>`;
+            element.innerHTML = `<p style="color:red;">Error al cargar ${filePath}: ${error.message}</p>`;
             console.error(error);
+            return false; // Indicar fallo
         }
     }
 
@@ -78,22 +91,28 @@ document.addEventListener('DOMContentLoaded', () => {
         script.id = scriptId;
         script.src = `js/${screenName}.js`;
         script.onerror = () => console.error(`Error al cargar el script: js/${screenName}.js`);
+        // script.onload = () => { // Opcional: llamar a una función init del script cargado
+        //     if (screenName === 'lista_esperada' && typeof initializeListaEsperadaLogic === 'function') {
+        //         // initializeListaEsperadaLogic(); // El script ya se auto-ejecuta si encuentra su div
+        //     }
+        // };
         document.body.appendChild(script);
     }
 
     async function loadScreen(screenName) {
-        // Detener timers/sondeos de la pantalla anterior (si los scripts específicos no lo hacen al ser removidos)
-        clearInterval(globalTimerInterval); // Detiene el timer de duración global
-        // Los intervalos de sondeo de estado son manejados por los scripts específicos de pantalla y
-        // deberían detenerse cuando el modo global ya no coincide con su modo.
+        // Al cambiar de pantalla, es buena idea detener el timer de duración global si estaba activo
+        clearInterval(globalTimerInterval);
+        globalSecondsReading = 0;
+        // El estado globalIsReaderActive y globalCurrentMode se actualizarán mediante syncUIWithBackendStatus
+        // o por las acciones del usuario en la nueva pantalla.
 
-        await loadHTML(`partials/${screenName}.html`, screenPlaceholder);
-        loadScreenScript(screenName); // Carga el JS después que el HTML esté en el DOM
-
-        // El script de pantalla (ej. entrada_salida.js) ahora es responsable de
-        // actualizar window.globalCurrentMode (a través de window.updateGlobalUIMode si es necesario)
-        // y de llamar a updateGlobalStatusBar.
-        // También son responsables de llamar a su propia función de updateButtonStates.
+        const htmlLoaded = await loadHTML(`partials/${screenName}.html`, screenPlaceholder);
+        if (htmlLoaded) {
+            loadScreenScript(screenName);
+        }
+        // Después de cargar la pantalla, sincronizar con el estado del backend
+        // para asegurar que la barra de estado y los botones de la nueva pantalla estén correctos.
+        await syncUIWithBackendStatus();
     }
 
     // --- Sincronización con el Estado del Backend ---
@@ -103,20 +122,21 @@ document.addEventListener('DOMContentLoaded', () => {
             const response = await fetch(`${window.API_BASE_URL}/reader-activity`);
             if (!response.ok) {
                 console.error("Error al obtener estado de actividad del lector (sync):", response.status);
-                window.setGlobalReaderActive(false); // Asumir inactivo si hay error
-                window.updateGlobalUIMode("Error de Conexión");
+                window.setGlobalReaderActive(false);
+                window.updateGlobalUIMode("Error Conexión Backend"); // Modo UI
                 window.updateGlobalReadingDuration(0, false);
                 return;
             }
             const activity = await response.json();
+            console.log("DEBUG: Estado del backend recibido:", activity);
 
             window.setGlobalReaderActive(activity.isReading);
 
-            let uiModeName = "Ninguno";
+            let uiModeName = "Ninguno"; // Modo para mostrar en la UI
             if (activity.activeMode === "ENTRADA_SALIDA") uiModeName = "Entrada/Salida";
             else if (activity.activeMode === "LIST_VERIFICATION") uiModeName = "A Partir de Lista";
             else if (activity.activeMode === "QUANTITY_COUNTING") uiModeName = "Conteo";
-            else if (activity.activeMode === "IDLE") uiModeName = "Inactivo (Backend)";
+            else if (activity.activeMode === "IDLE") uiModeName = "Inactivo"; // Más amigable que "IDLE"
 
             window.updateGlobalUIMode(uiModeName);
 
@@ -127,21 +147,18 @@ document.addEventListener('DOMContentLoaded', () => {
                 window.updateGlobalReadingDuration(0, false);
             }
 
-            console.log("DEBUG: Estado del backend sincronizado:", activity);
-
-            // Forzar actualización de botones de la pantalla actual si está cargada
-            // Esto es un poco un hack. Idealmente, los scripts de pantalla escucharían un evento global de cambio de estado.
-            const currentScreenViewId = screenPlaceholder.querySelector('div[id$="ScreenView"]')?.id;
-            if (currentScreenViewId) {
-                if (currentScreenViewId === 'entradaSalidaScreenView' && typeof initializeEntradaSalidaLogic === 'function') {
-                    // Re-llamar a la inicialización para que actualice sus botones y estado
-                    // initializeEntradaSalidaLogic(); // Esto podría causar problemas si añade listeners duplicados
-                    // Mejor es que cada script de pantalla exponga una función tipo 'refreshUI()'
-                }
-                // Similar para otros... por ahora, los scripts de pantalla se auto-actualizan
-                // en su inicialización o a través de sus propios sondeos de estado.
-            }
-
+            // Llamar a la función de actualización de botones de la pantalla actual si existe
+            // Esto es un poco un "efecto secundario deseado": los scripts de pantalla
+            // tienen su propia inicialización que llama a su updateButtonStates.
+            // Si la pantalla acaba de cargarse, su script se ejecutará y actualizará sus botones.
+            // Si la pantalla ya estaba cargada, esta sincronización actualiza las variables globales,
+            // y el polling de estado de esa pantalla (si lo tiene) o la próxima interacción del usuario
+            // debería reflejar el estado correcto de los botones.
+            // Para una actualización más directa de botones de una pantalla ya cargada, se podría
+            // emitir un evento personalizado aquí, o que cada script de pantalla
+            // exponga una función `refreshButtonStates()` que app.js pueda llamar.
+            // Por ahora, confiaremos en que la inicialización del script de pantalla y sus sondeos
+            // internos manejan la actualización de sus botones basados en el estado global.
 
         } catch (error) {
             console.error("Error de red al sincronizar UI con estado del backend:", error);
@@ -151,19 +168,18 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-
     // --- Inicialización de la Aplicación ---
-    loadHTML('partials/sidebar.html', sidebarContainer).then(() => {
-        if (!sidebarContainer.querySelector('.sidebar-content')) {
-            console.error("Contenido del sidebar no encontrado tras la carga.");
+    loadHTML('partials/sidebar.html', sidebarContainer).then((sidebarLoaded) => {
+        if (!sidebarLoaded || !sidebarContainer.querySelector('.sidebar-content')) {
+            console.error("Contenido del sidebar no encontrado o error al cargar.");
             return;
         }
         const navLinks = sidebarContainer.querySelectorAll('.sidebar-content ul li a');
         navLinks.forEach(link => {
-            link.addEventListener('click', (e) => {
+            link.addEventListener('click', async (e) => { // Hacemos el listener async
                 e.preventDefault();
                 const screenToLoad = link.getAttribute('data-screen');
-                let targetUIMode = "Ninguno";
+                let targetUIMode = "Ninguno"; // El nombre que se mostrará en la UI
                 if (screenToLoad === "entrada_salida") targetUIMode = "Entrada/Salida";
                 else if (screenToLoad === "lista_esperada") targetUIMode = "A Partir de Lista";
                 else if (screenToLoad === "conteo") targetUIMode = "Conteo";
@@ -172,22 +188,23 @@ document.addEventListener('DOMContentLoaded', () => {
                      alert("Por favor, detenga la lectura actual (" + window.globalCurrentMode + ") antes de cambiar de modo/pantalla.");
                      return;
                 }
-                // Actualiza el modo global de la UI inmediatamente al hacer clic,
-                // antes de que el backend lo confirme o la pantalla cargue su lógica.
-                window.updateGlobalUIMode(targetUIMode);
-                loadScreen(screenToLoad);
+                // No establecemos el modo global aquí directamente, loadScreen lo hará después de sync.
+                await loadScreen(screenToLoad); // Espera a que la pantalla cargue y se sincronice
             });
         });
 
         // Sincronizar con el estado del backend después de que el DOM esté listo y el sidebar cargado
         syncUIWithBackendStatus().then(() => {
-            // Opcional: Cargar una pantalla por defecto después de sincronizar
-            // Por ejemplo, si el backend dice que está en modo ENTRADA_SALIDA, cargar esa pantalla.
-            // O simplemente dejar al usuario que elija.
-            // if (window.globalCurrentMode === "Entrada/Salida") {
-            //     loadScreen('entrada_salida');
+            // Opcional: Cargar una pantalla por defecto
+            // Por ejemplo, si window.globalCurrentMode (actualizado por sync) es un modo válido,
+            // podríamos intentar cargar esa pantalla.
+            // if (window.globalCurrentMode && window.globalCurrentMode !== "Ninguno" && window.globalCurrentMode !== "Inactivo") {
+            //    let screenToLoadDefault = "";
+            //    if (window.globalCurrentMode === "Entrada/Salida") screenToLoadDefault = "entrada_salida";
+            //    // ... mapear otros modos ...
+            //    if (screenToLoadDefault) loadScreen(screenToLoadDefault);
             // } else {
-            //      screenPlaceholder.innerHTML = "<p>Selecciona una opción del menú para comenzar.</p>";
+            //     if(screenPlaceholder) screenPlaceholder.innerHTML = "<p>Selecciona una opción del menú para comenzar.</p>";
             // }
         });
 
@@ -195,6 +212,5 @@ document.addEventListener('DOMContentLoaded', () => {
         sidebarContainer.innerHTML = `<p style="color:red;">Error crítico al cargar sidebar: ${error.message}</p>`;
     });
 
-    // Actualización inicial de la barra de estado
-    window.updateGlobalStatusBar();
+    window.updateGlobalStatusBar(); // Actualización inicial de la barra de estado
 });

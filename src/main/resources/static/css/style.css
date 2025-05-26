@@ -381,3 +381,48 @@ input#epcFileLE{
     padding: 5px 10px;
     font-size: 0.85em;
 }
+/* --- Estilos para la pantalla de Conteo por Cantidad --- */
+
+/* Color de los recuadros de estado para la pantalla de Conteo */
+#conteoScreenView .status-boxes .status-box {
+    color: white; /* Texto blanco por defecto para mejor contraste */
+}
+
+/* 1. Tags Leídos (Únicos) - Verde */
+#conteoScreenView #boxTagsLeidosCT {
+    background-color: #5cb85c; /* Verde (similar al de "A Partir de Lista") */
+}
+#conteoScreenView #boxTagsLeidosCT h4,
+#conteoScreenView #boxTagsLeidosCT p {
+    color: white;
+}
+
+/* 2. Tags Faltantes - Rojo */
+#conteoScreenView #boxTagsFaltantesCT {
+    background-color: #d9534f; /* Rojo (similar al de "A Partir de Lista") */
+}
+#conteoScreenView #boxTagsFaltantesCT h4,
+#conteoScreenView #boxTagsFaltantesCT p {
+    color: white;
+}
+
+/* 3. Tags Excedentes - Amarillo */
+#conteoScreenView #boxTagsExcedentesCT {
+    background-color: #ffc107; /* Amarillo (similar al de "A Partir de Lista") */
+}
+/* Para el amarillo, el texto oscuro contrasta mejor */
+#conteoScreenView #boxTagsExcedentesCT h4,
+#conteoScreenView #boxTagsExcedentesCT p {
+    color: #333;
+}
+
+/* Color del botón Limpiar para la pantalla de Conteo */
+.controls button#btnClearConteo { /* Asegúrate que el ID en conteo.html sea btnClearConteo */
+    background-color: hsl(206, 7%, 38%); /* Gris oscuro específico */
+    border-color: hsl(206, 7%, 30%); /* Un borde ligeramente más oscuro */
+    color: white; /* Texto blanco para el botón oscuro */
+}
+.controls button#btnClearConteo:hover {
+    background-color: hsl(206, 7%, 30%);
+    border-color: hsl(206, 7%, 25%);
+}

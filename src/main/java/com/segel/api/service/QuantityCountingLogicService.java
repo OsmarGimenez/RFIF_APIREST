@@ -1,11 +1,11 @@
 package com.segel.api.service;
 
-// No usaremos TagEventDTO aquí directamente, pero lo mantenemos por si se extiende en el futuro.
-// import com.segel.api.dto.TagEventDTO;
+import com.segel.api.model.LecturaConteoSesionEntity; // Importar nueva entidad
 import com.segel.api.model.RfidEventEntity;
-import com.segel.api.model.TipoEventoEntity; // Importar
+import com.segel.api.model.TipoEventoEntity;
+import com.segel.api.persistence.LecturaConteoSesionRepository; // Importar nuevo repositorio
 import com.segel.api.persistence.RfidEventRepository;
-import com.segel.api.persistence.TipoEventoRepository; // Importar
+import com.segel.api.persistence.TipoEventoRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -13,39 +13,64 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.HashSet;
-import java.util.Optional; // Importar
+import java.util.Optional;
 import java.util.Set;
 
 @Service
 public class QuantityCountingLogicService {
 
     private final RfidEventRepository rfidEventRepository;
-    private final TipoEventoRepository tipoEventoRepository; // Inyectar
+    private final TipoEventoRepository tipoEventoRepository;
+    private final LecturaConteoSesionRepository lecturaConteoSesionRepository; // Nuevo repositorio
 
     private int targetCount = 0;
     private final Set<String> uniqueEpcsReadThisSession = Collections.synchronizedSet(new HashSet<>());
-    // currentReadCount se deriva ahora de uniqueEpcsReadThisSession.size() directamente
 
-    // Nombres de los tipos de evento para esta lógica
+    private LecturaConteoSesionEntity currentCountSession; // Sesión de conteo activa
+
     private static final String EVENT_NAME_CONTEO_LEIDO = "Conteo - Leído";
     private static final String EVENT_NAME_CONTEO_EXCESO = "Conteo - Exceso";
 
-
     @Autowired
     public QuantityCountingLogicService(RfidEventRepository rfidEventRepository,
-                                        TipoEventoRepository tipoEventoRepository) { // Añadir al constructor
+                                        TipoEventoRepository tipoEventoRepository,
+                                        LecturaConteoSesionRepository lecturaConteoSesionRepository) { // Añadir al constructor
         this.rfidEventRepository = rfidEventRepository;
-        this.tipoEventoRepository = tipoEventoRepository; // Asignar
+        this.tipoEventoRepository = tipoEventoRepository;
+        this.lecturaConteoSesionRepository = lecturaConteoSesionRepository; // Asignar
     }
 
-    public void setTargetCount(int target) {
+    // Llamado por TagEventService.setOperatingMode()
+    public void prepareNewCountSession(int target) {
         clearState();
         this.targetCount = Math.max(0, target); // Asegura que el objetivo no sea negativo
-        System.out.println("INFO (Counting Logic): Conteo objetivo establecido en: " + this.targetCount);
+        // La entidad de sesión se crea cuando realmente se inicia la lectura.
+        System.out.println("INFO (Counting Logic): Preparada nueva sesión de conteo. Objetivo: " + this.targetCount);
+    }
+
+    // Llamado por TagEventService.startReading() cuando el modo es QUANTITY_COUNTING
+    @Transactional
+    public boolean startCurrentCountSession() {
+        if (this.currentCountSession != null && this.currentCountSession.getFechaHoraFin() == null) {
+            System.err.println("WARN (Counting Logic): Ya hay una sesión de conteo activa (ID: " + this.currentCountSession.getSesionConteoId() + "). No se iniciará una nueva.");
+            return true;
+        }
+
+        this.currentCountSession = new LecturaConteoSesionEntity(
+                LocalDateTime.now(),
+                this.targetCount
+        );
+        this.currentCountSession = lecturaConteoSesionRepository.save(this.currentCountSession);
+        System.out.println("INFO (Counting Logic): Nueva sesión de conteo iniciada. ID Sesión: " + this.currentCountSession.getSesionConteoId() + ", Objetivo: " + this.targetCount);
+        return true;
     }
 
     @Transactional
     public void processTag(String epc, String rssi, String antenna) {
+        if (this.currentCountSession == null || this.currentCountSession.getSesionConteoId() == null) {
+            System.err.println("ERROR (Counting Logic): No hay una sesión de conteo activa para procesar el tag EPC: " + epc);
+            return;
+        }
         if (epc == null || epc.trim().isEmpty()) {
             return;
         }
@@ -53,10 +78,10 @@ public class QuantityCountingLogicService {
         String eventTypeName;
         Optional<TipoEventoEntity> optTipoEvento;
 
-        if (uniqueEpcsReadThisSession.add(normalizedEpc)) {
-            long currentUniqueCount = uniqueEpcsReadThisSession.size();
+        if (uniqueEpcsReadThisSession.add(normalizedEpc)) { // Solo procesa si es un EPC nuevo para esta sesión
+            long currentUniqueReadInSession = uniqueEpcsReadThisSession.size();
 
-            if (targetCount > 0 && currentUniqueCount > targetCount) {
+            if (targetCount > 0 && currentUniqueReadInSession > targetCount) {
                 eventTypeName = EVENT_NAME_CONTEO_EXCESO;
             } else {
                 eventTypeName = EVENT_NAME_CONTEO_LEIDO;
@@ -65,8 +90,6 @@ public class QuantityCountingLogicService {
             optTipoEvento = tipoEventoRepository.findByNombreEvento(eventTypeName);
             if (optTipoEvento.isEmpty()) {
                 System.err.println("ERROR (Counting Logic): Tipo de evento '" + eventTypeName + "' no encontrado. EPC: " + normalizedEpc);
-                // Considerar no agregar el EPC a uniqueEpcsReadThisSession si el tipo de evento no existe,
-                // o manejar el error de otra manera. Por ahora, el EPC queda en el set.
                 return;
             }
 
@@ -76,18 +99,38 @@ public class QuantityCountingLogicService {
                     LocalDateTime.now(),
                     rssi,
                     antenna,
-                    "No asignado", // Ticket
-                    null,         // estadoColor (no se gestiona en este modo directamente)
-                    null          // descripcion (no se gestiona en este modo directamente)
+                    "No asignado",
+                    null,
+                    null
             );
+            event.setSesionConteo(this.currentCountSession); // *** Asignar la sesión de conteo actual al evento ***
             rfidEventRepository.save(event);
-            System.out.println("INFO (Counting Logic): Tag EPC: " + normalizedEpc + " contado. Total únicos: " + currentUniqueCount + ". Evento: " + eventTypeName);
+            System.out.println("INFO (Counting Logic): Tag EPC: " + normalizedEpc + " contado. Total únicos en sesión: " + currentUniqueReadInSession + ". Evento: " + eventTypeName + ". SesionID: " + this.currentCountSession.getSesionConteoId());
+
+            // Actualizar el contador en la entidad de sesión en memoria (se guardará al concluir)
+            this.currentCountSession.setCantidadLeidosUnicos((int)currentUniqueReadInSession);
+        }
+    }
+
+    // Llamado por TagEventService.stopReading() o al limpiar el modo.
+    @Transactional
+    public void concludeCurrentCountSession() {
+        if (this.currentCountSession != null && this.currentCountSession.getFechaHoraFin() == null) {
+            this.currentCountSession.setFechaHoraFin(LocalDateTime.now());
+            // La cantidadLeidosUnicos ya se fue actualizando en processTag
+            // this.currentCountSession.setCantidadLeidosUnicos(uniqueEpcsReadThisSession.size());
+
+            lecturaConteoSesionRepository.save(this.currentCountSession);
+            System.out.println("INFO (Counting Logic): Sesión de conteo ID: " + this.currentCountSession.getSesionConteoId() + " concluida. Objetivo: " + this.currentCountSession.getCantidadObjetivo() + ", Leídos Únicos: " + this.currentCountSession.getCantidadLeidosUnicos());
+        } else {
+            System.out.println("INFO (Counting Logic): No hay sesión de conteo activa para concluir o ya fue concluida.");
         }
     }
 
     public void clearState() {
         targetCount = 0;
         uniqueEpcsReadThisSession.clear();
+        this.currentCountSession = null; // Importante resetear la sesión actual
         System.out.println("INFO (Counting Logic): Estados en memoria limpiados.");
     }
 
@@ -101,7 +144,8 @@ public class QuantityCountingLogicService {
 
     public long getRemainingOrExcessCount() {
         if (targetCount > 0) {
-            return targetCount - uniqueEpcsReadThisSession.size();
+            long currentCount = uniqueEpcsReadThisSession.size();
+            return targetCount - currentCount;
         }
         return 0;
     }

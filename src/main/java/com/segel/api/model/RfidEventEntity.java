@@ -36,31 +36,21 @@ public class RfidEventEntity {
     @Column(name = "descripcion", columnDefinition = "TEXT")
     private String descripcion;
 
-    // --- NUEVA RELACIÓN CON LecturaListaSesionEntity ---
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "sesion_id", nullable = true) // 'sesion_id' es la FK en la tabla rfid_events
-    private LecturaListaSesionEntity sesion; // Referencia a la entidad de la sesión
+    @JoinColumn(name = "sesion_id", nullable = true)
+    private LecturaListaSesionEntity sesion;
+
+    // --- NUEVA RELACIÓN CON LecturaConteoSesionEntity ---
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "sesion_conteo_id", nullable = true) // 'sesion_conteo_id' es la FK en la tabla rfid_events
+    private LecturaConteoSesionEntity sesionConteo; // Referencia a la entidad de la sesión de conteo
+
 
     // Constructor vacío
     public RfidEventEntity() {
     }
 
-    // Constructor para cuando se crea un evento sin una sesión de lista específica
-    public RfidEventEntity(String epc, TipoEventoEntity tipoEvento, LocalDateTime eventTime,
-                           String rssi, String antenna, String ticket,
-                           String estadoColor, String descripcion) {
-        this.epc = epc;
-        this.tipoEvento = tipoEvento;
-        this.eventTime = eventTime;
-        this.rssi = rssi;
-        this.antenna = antenna;
-        this.ticket = ticket;
-        this.estadoColor = estadoColor;
-        this.descripcion = descripcion;
-        this.sesion = null; // Por defecto, no pertenece a una sesión de lista específica
-    }
-
-    // Constructor completo (opcional, o usar setters)
+    // Constructor que incluye la sesión de lista pero no la de conteo (y viceversa podría existir)
     public RfidEventEntity(String epc, TipoEventoEntity tipoEvento, LocalDateTime eventTime,
                            String rssi, String antenna, String ticket,
                            String estadoColor, String descripcion, LecturaListaSesionEntity sesion) {
@@ -72,7 +62,41 @@ public class RfidEventEntity {
         this.ticket = ticket;
         this.estadoColor = estadoColor;
         this.descripcion = descripcion;
-        this.sesion = sesion; // Asignar la sesión
+        this.sesion = sesion;
+        this.sesionConteo = null; // Por defecto
+    }
+
+    // Constructor para cuando se crea un evento sin ninguna sesión específica (o solo sesión de conteo)
+    public RfidEventEntity(String epc, TipoEventoEntity tipoEvento, LocalDateTime eventTime,
+                           String rssi, String antenna, String ticket,
+                           String estadoColor, String descripcion) {
+        this.epc = epc;
+        this.tipoEvento = tipoEvento;
+        this.eventTime = eventTime;
+        this.rssi = rssi;
+        this.antenna = antenna;
+        this.ticket = ticket;
+        this.estadoColor = estadoColor;
+        this.descripcion = descripcion;
+        this.sesion = null;
+        this.sesionConteo = null;
+    }
+
+    // Constructor "más completo" (ejemplo, puedes tener varias sobrecargas o usar setters)
+    public RfidEventEntity(String epc, TipoEventoEntity tipoEvento, LocalDateTime eventTime,
+                           String rssi, String antenna, String ticket, String estadoColor,
+                           String descripcion, LecturaListaSesionEntity sesion,
+                           LecturaConteoSesionEntity sesionConteo) {
+        this.epc = epc;
+        this.tipoEvento = tipoEvento;
+        this.eventTime = eventTime;
+        this.rssi = rssi;
+        this.antenna = antenna;
+        this.ticket = ticket;
+        this.estadoColor = estadoColor;
+        this.descripcion = descripcion;
+        this.sesion = sesion;
+        this.sesionConteo = sesionConteo;
     }
 
 
@@ -155,5 +179,14 @@ public class RfidEventEntity {
 
     public void setSesion(LecturaListaSesionEntity sesion) {
         this.sesion = sesion;
+    }
+
+    // Getters y Setters para la nueva relación de sesión de conteo
+    public LecturaConteoSesionEntity getSesionConteo() {
+        return sesionConteo;
+    }
+
+    public void setSesionConteo(LecturaConteoSesionEntity sesionConteo) {
+        this.sesionConteo = sesionConteo;
     }
 }

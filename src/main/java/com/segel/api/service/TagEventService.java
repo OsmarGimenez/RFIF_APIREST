@@ -2,9 +2,11 @@ package com.segel.api.service;
 
 import com.segel.api.dto.RfidEventDetailDTO;
 import com.segel.api.dto.TagEventDTO;
+import com.segel.api.model.LecturaConteoSesionEntity; // Asegúrate de que este import esté
 import com.segel.api.model.LecturaListaSesionEntity;
 import com.segel.api.model.RfidEventEntity;
 import com.segel.api.model.TipoEventoEntity;
+import com.segel.api.persistence.LecturaConteoSesionRepository; // Asegúrate de que este import esté
 import com.segel.api.persistence.LecturaListaSesionRepository;
 import com.segel.api.persistence.RfidEventRepository;
 import com.segel.api.persistence.TipoEventoRepository;
@@ -18,7 +20,7 @@ import com.rscja.deviceapi.entity.UHFTAGInfo;
 
 import jakarta.annotation.PreDestroy;
 import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter; // Importar para el formateador de CSV
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -34,6 +36,7 @@ public class TagEventService {
     private final QuantityCountingLogicService quantityCountingLogicService;
     private final RfidEventRepository rfidEventRepository;
     private final LecturaListaSesionRepository lecturaListaSesionRepository;
+    private final LecturaConteoSesionRepository lecturaConteoSesionRepository; // Declaración del campo
 
     private final RFIDWithUHFNetworkUR4 rfidReader;
     private final AtomicBoolean isReading = new AtomicBoolean(false);
@@ -55,12 +58,14 @@ public class TagEventService {
                            ListVerificationLogicService listVerificationLogicService,
                            QuantityCountingLogicService quantityCountingLogicService,
                            RfidEventRepository rfidEventRepository,
-                           LecturaListaSesionRepository lecturaListaSesionRepository) {
+                           LecturaListaSesionRepository lecturaListaSesionRepository,
+                           LecturaConteoSesionRepository lecturaConteoSesionRepository) { // Inyección en el constructor
         this.entradaSalidaLogicService = entradaSalidaLogicService;
         this.listVerificationLogicService = listVerificationLogicService;
         this.quantityCountingLogicService = quantityCountingLogicService;
         this.rfidEventRepository = rfidEventRepository;
         this.lecturaListaSesionRepository = lecturaListaSesionRepository;
+        this.lecturaConteoSesionRepository = lecturaConteoSesionRepository; // Asignación en el constructor
 
         this.rfidReader = new RFIDWithUHFNetworkUR4();
         System.out.println("DEBUG: Instancia de RFIDWithUHFNetworkUR4 creada en TagEventService.");
@@ -99,7 +104,7 @@ public class TagEventService {
                 break;
             case QUANTITY_COUNTING:
                 if (params instanceof Integer) {
-                    quantityCountingLogicService.setTargetCount((Integer) params);
+                    quantityCountingLogicService.prepareNewCountSession((Integer) params); // Llamada a prepareNewCountSession
                 } else {
                     System.err.println("ERROR: Modo QUANTITY_COUNTING requiere un entero (target count) como parámetro.");
                     this.currentOperatingMode = OperatingMode.IDLE;
@@ -123,6 +128,7 @@ public class TagEventService {
             System.err.println("ERROR: No se ha establecido un modo de operación.");
             return;
         }
+
         if (this.currentOperatingMode == OperatingMode.LIST_VERIFICATION) {
             boolean sessionStarted = listVerificationLogicService.startCurrentListSession();
             if (!sessionStarted) {
@@ -130,7 +136,15 @@ public class TagEventService {
                 isReading.set(false);
                 return;
             }
+        } else if (this.currentOperatingMode == OperatingMode.QUANTITY_COUNTING) { // Inicio de sesión para Conteo
+            boolean sessionStarted = quantityCountingLogicService.startCurrentCountSession();
+            if (!sessionStarted) {
+                System.err.println("ERROR: No se pudo iniciar la sesión de conteo en QuantityCountingLogicService.");
+                isReading.set(false);
+                return;
+            }
         }
+
         if (isReading.compareAndSet(false, true)) {
             readingStartTimeMillis = System.currentTimeMillis();
             System.out.println("INFO: Iniciando lectura (Modo: " + currentOperatingMode + ") en IP: " + readerIp + ", Puerto: " + readerPort);
@@ -180,8 +194,11 @@ public class TagEventService {
                     this.rfidReader.free();
                     System.out.println("INFO: Recursos del lector liberados.");
                     readingStartTimeMillis = 0L;
+
                     if (currentOperatingMode == OperatingMode.LIST_VERIFICATION) {
                         listVerificationLogicService.concludeCurrentListSession();
+                    } else if (currentOperatingMode == OperatingMode.QUANTITY_COUNTING) { // Concluir sesión de conteo
+                        quantityCountingLogicService.concludeCurrentCountSession();
                     }
                 });
             } catch (Exception e) {
@@ -205,9 +222,21 @@ public class TagEventService {
                     if (!readerExecutorService.awaitTermination(7, TimeUnit.SECONDS)) {
                         readerExecutorService.shutdownNow();
                         System.err.println("WARN: El servicio de lector no terminó tareas pendientes, forzando apagado del hilo.");
+                        // Lógica de conclusión explícita si el hilo se fuerza a detener
+                        if (modeWhenStopping == OperatingMode.LIST_VERIFICATION) {
+                            listVerificationLogicService.concludeCurrentListSession();
+                        } else if (modeWhenStopping == OperatingMode.QUANTITY_COUNTING) {
+                            quantityCountingLogicService.concludeCurrentCountSession();
+                        }
                     }
                 } catch (InterruptedException ie) {
-                    readerExecutorService.shutdownNow(); Thread.currentThread().interrupt();
+                    readerExecutorService.shutdownNow();
+                    Thread.currentThread().interrupt();
+                    if (modeWhenStopping == OperatingMode.LIST_VERIFICATION) {
+                        listVerificationLogicService.concludeCurrentListSession();
+                    } else if (modeWhenStopping == OperatingMode.QUANTITY_COUNTING) {
+                        quantityCountingLogicService.concludeCurrentCountSession();
+                    }
                 }
             }
         } else { System.out.println("INFO: Lectura no estaba en progreso."); }
@@ -273,6 +302,7 @@ public class TagEventService {
             case LIST_VERIFICATION:
                 return listVerificationLogicService.generateCsvReportString();
             case QUANTITY_COUNTING:
+                // return quantityCountingLogicService.generateCsvReportString(); // A implementar
                 System.out.println("WARN: Generación de CSV para Modo Conteo no implementada aún.");
                 return "Reporte CSV para Modo Conteo no implementado.";
             default:
@@ -328,18 +358,16 @@ public class TagEventService {
                 .collect(Collectors.toList());
     }
 
-    // --- NUEVO MÉTODO PARA GENERAR REPORTE CSV DE UNA SESIÓN HISTÓRICA ---
     public String generateCsvReportForHistoricalSession(Long sesionId) {
         if (sesionId == null) {
             return "Error: ID de sesión no proporcionado para el reporte.";
         }
-        List<RfidEventDetailDTO> eventDetails = getListVerificationSessionDetails(sesionId);
+        List<RfidEventDetailDTO> eventDetails = getListVerificationSessionDetails(sesionId); // Usa el método existente
         if (eventDetails.isEmpty()) {
             return "Error: No hay eventos detallados para la sesión ID " + sesionId + " para generar el reporte.";
         }
 
         StringBuilder csvBuilder = new StringBuilder();
-        // Encabezado del CSV (igual al de la tabla del modal)
         csvBuilder.append("ID Evento,EPC,Hora Evento,Tipo Evento,Estado Semáforo,RSSI,Antena,Ticket,Descripción\n");
 
         for (RfidEventDetailDTO dto : eventDetails) {
@@ -357,7 +385,6 @@ public class TagEventService {
         return csvBuilder.toString();
     }
 
-    // Método ayudante simple para escapar campos CSV (debe estar en la clase o ser accesible)
     private String escapeCsvField(String data) {
         if (data == null) {
             return "";
@@ -370,7 +397,6 @@ public class TagEventService {
     }
 
     public void simulateTagRead(String epc, OperatingMode modeToSimulate) {
-        // ... (código existente)
         System.out.println("INFO: SIMULANDO LECTURA (Modo: " + modeToSimulate + ") PARA EPC: " + epc);
         String simulatedRssi = "-55dBm";
         String simulatedAntenna = "1";
@@ -387,5 +413,37 @@ public class TagEventService {
             case QUANTITY_COUNTING: quantityCountingLogicService.processTag(epc, simulatedRssi, simulatedAntenna); break;
             default: System.err.println("ERROR: Modo de simulación no soportado: " + modeToSimulate); break;
         }
+    }
+
+    // --- NUEVOS MÉTODOS PARA SESIONES DE CONTEO ---
+    public List<LecturaConteoSesionEntity> getAllQuantityCountingSessions() {
+        return lecturaConteoSesionRepository.findAllByOrderByFechaHoraInicioDesc();
+    }
+
+    public List<RfidEventDetailDTO> getQuantityCountingSessionDetails(Long sesionConteoId) {
+        if (sesionConteoId == null) {
+            System.err.println("ERROR: sesionConteoId es nulo al obtener detalles de sesión de conteo.");
+            return Collections.emptyList();
+        }
+        List<RfidEventEntity> eventsInSession = rfidEventRepository.findBySesionConteo_SesionConteoIdOrderByEventTimeDesc(sesionConteoId);
+
+        if (eventsInSession.isEmpty()) {
+            System.out.println("INFO: No se encontraron eventos para la sesión de conteo ID: " + sesionConteoId);
+            return Collections.emptyList();
+        }
+
+        return eventsInSession.stream()
+                .map(eventEntity -> {
+                    TipoEventoEntity tipoEvento = eventEntity.getTipoEvento();
+                    return new RfidEventDetailDTO(
+                            eventEntity.getId(), eventEntity.getEpc(), eventEntity.getEventTime(),
+                            eventEntity.getRssi(), eventEntity.getAntenna(), eventEntity.getTicket(),
+                            eventEntity.getEstadoColor(),
+                            eventEntity.getDescripcion(),
+                            tipoEvento != null ? tipoEvento.getNombreEvento() : "Desconocido",
+                            tipoEvento != null ? tipoEvento.getDescripcionTipo() : "Sin descripción de tipo"
+                    );
+                })
+                .collect(Collectors.toList());
     }
 }

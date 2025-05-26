@@ -3,6 +3,7 @@ package com.segel.api.controller;
 import com.segel.api.dto.RfidEventDetailDTO;
 import com.segel.api.dto.TagEventDTO;
 import com.segel.api.dto.UpdateDescriptionRequestDTO;
+import com.segel.api.model.LecturaConteoSesionEntity; // Importar la entidad de sesión de conteo
 import com.segel.api.model.LecturaListaSesionEntity;
 import com.segel.api.service.OperatingMode;
 import com.segel.api.service.TagEventService;
@@ -126,6 +127,22 @@ public class TagEventController {
         return ResponseEntity.ok(eventDetails);
     }
 
+    // --- Endpoints para Historial de Sesiones de Conteo ---
+    @GetMapping("/quantity-counting/sessions")
+    public ResponseEntity<List<LecturaConteoSesionEntity>> getQuantityCountingSessions() {
+        List<LecturaConteoSesionEntity> sessions = tagEventService.getAllQuantityCountingSessions();
+        return ResponseEntity.ok(sessions);
+    }
+
+    @GetMapping("/quantity-counting/sessions/{sesionConteoId}/details")
+    public ResponseEntity<List<RfidEventDetailDTO>> getQuantityCountingSessionDetails(@PathVariable Long sesionConteoId) {
+        List<RfidEventDetailDTO> eventDetails = tagEventService.getQuantityCountingSessionDetails(sesionConteoId);
+        if (eventDetails == null) {
+            return ResponseEntity.ok(Collections.emptyList());
+        }
+        return ResponseEntity.ok(eventDetails);
+    }
+
 
     // --- Endpoints de Reporte ---
     @GetMapping(value = "/report/entrada-salida/csv", produces = "text/csv")
@@ -145,7 +162,6 @@ public class TagEventController {
 
     @GetMapping(value = "/report/list-verification/csv", produces = "text/csv")
     public ResponseEntity<String> getCsvReportListVerification() {
-        // Este endpoint es para el reporte de la SESIÓN ACTUAL del modo LIST_VERIFICATION
         String csvData = tagEventService.generateCsvReportForCurrentMode();
         if (csvData.startsWith("Error:") || csvData.contains("no implementado") || !csvData.contains("EPC")) {
             return ResponseEntity.badRequest().body("Error al generar el reporte CSV para la sesión actual de Verificación de Lista: " + csvData);
@@ -159,25 +175,20 @@ public class TagEventController {
         return ResponseEntity.ok().headers(headers).body(csvData);
     }
 
-    // --- NUEVO ENDPOINT PARA REPORTE CSV DE UNA SESIÓN HISTÓRICA ESPECÍFICA ---
     @GetMapping(value = "/list-verification/sessions/{sesionId}/report/csv", produces = "text/csv")
     public ResponseEntity<String> getCsvReportForHistoricalSession(@PathVariable Long sesionId) {
         String csvData = tagEventService.generateCsvReportForHistoricalSession(sesionId);
-
         if (csvData == null || csvData.startsWith("Error:") || !csvData.contains("EPC")) {
             return ResponseEntity.badRequest().body("Error al generar el reporte CSV para la sesión histórica ID " + sesionId + ": " + (csvData != null ? csvData : "Datos no encontrados."));
         }
-
-        LocalDateTime now = LocalDateTime.now(); // O usar la fecha de la sesión para el nombre del archivo
+        LocalDateTime now = LocalDateTime.now();
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss");
-        String fileName = "reporte_sesion_historica_" + sesionId + "_" + now.format(formatter) + ".csv";
-
+        String fileName = "reporte_sesion_historica_lista_" + sesionId + "_" + now.format(formatter) + ".csv"; // Ajustado nombre
         HttpHeaders headers = new HttpHeaders();
         headers.add(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + fileName + "\"");
         headers.add(HttpHeaders.CONTENT_TYPE, MediaType.TEXT_PLAIN_VALUE + "; charset=utf-8");
-
-        return ResponseEntity.ok()
-                .headers(headers)
-                .body(csvData);
+        return ResponseEntity.ok().headers(headers).body(csvData);
     }
+
+    // --- Podríamos añadir aquí los endpoints para reportes de sesiones de conteo si son necesarios ---
 }
