@@ -1,0 +1,55 @@
+version: '3.8' # Especifica la versión de la sintaxis de Docker Compose
+
+services:
+  # Servicio para la API RFID (tu aplicación Spring Boot)
+  rfid-api:
+    build:
+      context: . # Usa el Dockerfile en el directorio actual (raíz del proyecto)
+      dockerfile: Dockerfile # Nombre del Dockerfile a usar
+    image: rfid-api-app:latest # Nombre y tag para la imagen que se construirá
+    container_name: rfid_api_container
+    ports:
+      - "8080:8080" # Mapea el puerto 8080 del host al puerto 8080 del contenedor (donde corre Spring Boot)
+    depends_on:
+      - postgres-db # Indica que este servicio depende de que el servicio postgres-db esté listo
+    environment:
+      # Configuración para conectar a la base de datos PostgreSQL que correrá en otro contenedor
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres-db:5432/rfid_db
+      - SPRING_DATASOURCE_USERNAME=postgres
+      - SPRING_DATASOURCE_PASSWORD=1234
+      - SPRING_JPA_HIBERNATE_DDL_AUTO=update # O create, create-drop, validate según necesites
+      # Configuración del lector RFID (puedes pasarla aquí o mantenerla en application.properties si el JAR ya la tiene)
+      - READER_IP=${READER_IP:-10.3.0.71} # Usa la variable de entorno READER_IP o 10.3.0.71 por defecto
+      - READER_PORT=${READER_PORT:-8888}   # Usa la variable de entorno READER_PORT o 8888 por defecto
+    networks:
+      - rfid-network
+
+  # Servicio para la Base de Datos PostgreSQL
+  postgres-db:
+    image: postgres:15-alpine # Usa una imagen oficial de PostgreSQL (versión 15, ligera con Alpine Linux)
+    container_name: postgres_rfid_db
+    ports:
+      - "5433:5432" # Mapea el puerto 5432 del contenedor de Postgres al puerto 5433 del host
+      # (Uso 5433 para evitar conflictos si ya tienes un Postgres local en 5432)
+    environment:
+      - POSTGRES_DB=rfid_db # Nombre de la base de datos a crear
+      - POSTGRES_USER=postgres # Usuario para la base de datos
+      - POSTGRES_PASSWORD=1234 # Contraseña para el usuario
+    #volumes:
+    # - postgres_data:/var/lib/postgresql/data # Persiste los datos de la BD en un volumen Docker
+    networks:
+      - rfid-network
+    healthcheck: # Verifica que la BD esté lista antes de que la API intente conectar
+      test: ["CMD-SHELL", "pg_isready -U postgres -d rfid_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+# Definición de la red para que los contenedores se puedan comunicar
+networks:
+  rfid-network:
+    driver: bridge
+
+# Definición del volumen para persistir los datos de PostgreSQL
+volumes:
+  postgres_data:
